@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ "Editar Alumno" if alumno else "Nuevo Alumno" }} - Sistema Escolar</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <!-- Menú Superior -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/principal">Sistema Escolar</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/principal">← Volver al Listado</a>
+                    </li>
+                </ul>
+                <a href="/login" class="btn btn-outline-light btn-sm">Cerrar Sesión</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido del Formulario -->
+    <div class="container my-4">
+        <div class="card shadow">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">{{ "Modificar Datos del Alumno" if alumno else "Registrar Nuevo Alumno" }}</h4>
+            </div>
+            <div class="card-body">
+                
+                <form method="POST">
+                    <!-- Sección 1: Datos Personales -->
+                    <h5 class="text-secondary border-bottom pb-2 mb-3">1. Datos Personales</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Apellido *</label>
+                            <input type="text" class="form-control" name="apellido" value="{{ alumno.apellido if alumno else '' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Nombre *</label>
+                            <input type="text" class="form-control" name="nombre" value="{{ alumno.nombre if alumno else '' }}" required>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">DNI *</label>
+                            <input type="text" class="form-control" name="dni" id="dni" value="{{ alumno.dni if alumno else '' }}" required oninput="calcularCUIL()" placeholder="Sin puntos">
+                        </div>
+                            
+                        <div class="col-md-4">
+                            <label class="form-label">Tipo / Prefijo CUIL</label>
+                            <select id="prefijo_cuil" class="form-select" onchange="calcularCUIL()">
+                                <option value="20">Masculino (20)</option>
+                                <option value="27">Femenino (27)</option>
+                                <option value="23">Genérico / Otro (23)</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">CUIL (Calculado Automáticamente)</label>
+                            <input type="text" class="form-control bg-light" name="cuil" id="cuil" value="{{ alumno.cuil if alumno else '' }}" readonly>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-2">
+                            <label class="form-label">Edad</label>
+                            <input type="number" class="form-control" name="edad" value="{{ alumno.edad if alumno else '' }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Nacimiento</label>
+                            <input type="text" class="form-control" name="fecha_nacimiento" placeholder="DD/MM/AAAA" value="{{ fecha_str if fecha_str is defined else (alumno.fecha_nacimiento.strftime('%d/%m/%Y') if alumno and alumno.fecha_nacimiento else '') }}">
+                            <div class="form-text" style="font-size: 0.75rem;">Formato: DD/MM/AAAA</div>
+                        </div>
+                             <!-- Nuevo campo Sexo -->
+                        <div class="col-md-3">
+                            <label class="form-label">Sexo</label>
+                            <select class="form-select" name="sexo">
+                                <option value="Masculino" {{ 'selected' if alumno and alumno.sexo == 'Masculino' else '' }}>Masculino</option>
+                                <option value="Femenino" {{ 'selected' if alumno and alumno.sexo == 'Femenino' else '' }}>Femenino</option>
+                                <option value="Otro" {{ 'selected' if alumno and alumno.sexo == 'Otro' else '' }}>Otro</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Sección 2: Contacto y Domicilio -->
+                    <h5 class="text-secondary border-bottom pb-2 mb-3 mt-4">2. Contacto y Domicilio</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Teléfono</label>
+                            <input type="text" class="form-control" name="telefono" value="{{ alumno.telefono if alumno else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Correo Electrónico</label>
+                            <input type="email" class="form-control" name="correo" value="{{ alumno.correo if alumno else '' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Localidad</label>
+                            <input type="text" class="form-control" name="localidad" value="{{ alumno.localidad if alumno else '' }}">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label class="form-label">Dirección</label>
+                            <input type="text" class="form-control" name="direccion" value="{{ alumno.direccion if alumno else '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Sección 3: Antecedentes Escolares -->
+                    <h5 class="text-secondary border-bottom pb-2 mb-3 mt-4">3. Antecedentes Escolares</h5>
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <label class="form-label">Escuela Anterior</label>
+                            <input type="text" class="form-control" name="escuela_anterior" value="{{ alumno.escuela_anterior if alumno else '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Sección 4: Grupo Familiar / Tutores -->
+                    <h5 class="text-secondary border-bottom pb-2 mb-3 mt-4">4. Grupo Familiar / Responsables</h5>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Apellido del Padre</label>
+                            <input type="text" class="form-control" name="ape_padre" value="{{ alumno.ape_padre if alumno else '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">DNI del Padre</label>
+                            <input type="text" class="form-control" name="dni_padre" value="{{ alumno.dni_padre if alumno else '' }}">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Apellido de la Madre</label>
+                            <input type="text" class="form-control" name="ape_madre" value="{{ alumno.ape_madre if alumno else '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">DNI de la Madre</label>
+                            <input type="text" class="form-control" name="dni_madre" value="{{ alumno.dni_madre if alumno else '' }}">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Apellido del Tutor</label>
+                            <input type="text" class="form-control" name="ape_tutor" value="{{ alumno.ape_tutor if alumno else '' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">DNI del Tutor</label>
+                            <input type="text" class="form-control" name="dni_tutor" value="{{ alumno.dni_tutor if alumno else '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Botones de Guardar / Cancelar -->
+                    <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                        <a href="{{ url_for('detalle_alumno', id_alumno=alumno.id_alumno) if alumno else url_for('principal') }}" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-success">Guardar Alumno</button>
+                    </div>
+                </form>
+
+            </div>
+        </div>
+    </div>
+
+
+<script>
+    function calcularCUIL() {
+        const dniInput = document.getElementById('dni').value.replace(/\D/g, ''); // Solo números
+        const prefijo = document.getElementById('prefijo_cuil').value;
+        const campoCuil = document.getElementById('cuil');
+
+        // Si el DNI tiene menos de 7 dígitos, limpiamos el CUIL
+        if (dniInput.length < 7 || dniInput.length > 8) {
+            campoCuil.value = '';
+            return;
+        }
+
+        // Asegurar 8 dígitos rellenando con ceros a la izquierda si es necesario
+        let dni = dniInput.padStart(8, '0');
+        let base = prefijo + dni;
+
+        // Algoritmo del Módulo 11
+        let acumulado = 0;
+        let factores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+
+        for (let i = 0; i < 10; i++) {
+            acumulado += parseInt(base[i]) * factores[i];
+        }
+
+        let resto = acumulado % 11;
+        let verificador = 11 - resto;
+
+        let prefijoFinal = prefijo;
+
+        if (verificador === 11) {
+            verificador = 0;
+        } else if (verificador === 10) {
+            // Si el dígito verificador da 10, por regla general se rota el prefijo a 23 y se recalcula
+            prefijoFinal = '23';
+            base = prefijoFinal + dni;
+            acumulado = 0;
+            for (let i = 0; i < 10; i++) {
+                acumulado += parseInt(base[i]) * factores[i];
+            }
+            resto = acumulado % 11;
+            verificador = 11 - resto;
+            if (verificador === 11) verificador = 0;
+            if (verificador === 10) verificador = 9;
+        }
+
+        // Formato final: XX-DNI-V
+        campoCuil.value = `${prefijoFinal}-${dniInput}-${verificador}`;
+    }
+</script>
+</body>
+</html>

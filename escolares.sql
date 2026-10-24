@@ -1,0 +1,20 @@
+CREATE TABLE alumnos (
+    id_alumno SERIAL PRIMARY KEY,
+    apellido VARCHAR(100) NOT NULL,
+    nombre VARCHAR(100) NOT NULL,
+    dni VARCHAR(20) UNIQUE NOT NULL,
+    cuil VARCHAR(20),
+    edad INT,
+    fecha_nacimiento DATE,
+    telefono VARCHAR(30),
+    correo VARCHAR(150),
+    direccion VARCHAR(255),
+    localidad VARCHAR(100),
+    escuela_anterior VARCHAR(150),
+    ape_padre VARCHAR(100),
+    dni_padre VARCHAR(20),
+    ape_madre VARCHAR(100),
+    dni_madre VARCHAR(20),
+    ape_tutor VARCHAR(100),
+    dni_tutor VARCHAR(20)
+);

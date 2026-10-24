@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Ficha de Alumno - Sistema Escolar</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+    <!-- Menú Superior -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/principal">Sistema Escolar</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/principal">← Volver al Listado</a>
+                    </li>
+                </ul>
+                <a href="/login" class="btn btn-outline-light btn-sm">Cerrar Sesión</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido de la Ficha -->
+    <div class="container my-4">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Ficha de Legajo del Alumno</h4>
+                <span class="badge bg-light text-dark">ID: {{ alumno.id_alumno }}</span>
+            </div>
+            <div class="card-body">
+                
+                <!-- Sección 1: Datos Personales -->
+                <h5 class="text-secondary border-bottom pb-2 mb-3">1. Datos Personales</h5>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Apellido:</strong> {{ alumno.apellido }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Nombre:</strong> {{ alumno.nombre }}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-2">
+                        <strong>DNI:</strong> {{ alumno.dni }}
+                    </div>
+                   
+                    <div class="col-md-2">
+                        <strong>CUIL:</strong> {{ alumno.cuil or '-' }}
+                    </div>
+                     <div class="col-md-2">
+                        <strong>Sexo:</strong> {{ alumno.sexo or '-' }}
+                    </div>
+                    <div class="col-md-2">
+                        <strong>Edad:</strong> {{ alumno.edad or '-' }}
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Nacimiento:</strong> {{ fecha_str}}
+                    </div>
+                </div>
+
+                <!-- Sección 2: Contacto y Domicilio -->
+                <h5 class="text-secondary border-bottom pb-2 mb-3 mt-4">2. Contacto y Domicilio</h5>
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <strong>Teléfono:</strong> {{ alumno.telefono or '-' }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Correo Electrónico:</strong> {{ alumno.correo or '-' }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Localidad:</strong> {{ alumno.localidad or '-' }}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <strong>Dirección:</strong> {{ alumno.direccion or '-' }}
+                    </div>
+                </div>
+
+                <!-- Sección 3: Antecedentes Escolares -->
+                <h5 class="text-secondary border-bottom pb-2 mb-3 mt-4">3. Antecedentes Escolares</h5>
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <strong>Escuela Anterior:</strong> {{ alumno.escuela_anterior or 'Ninguna / Ingreso inicial' }}
+                    </div>
+                </div>
+
+                <!-- Sección 4: Datos Familiares / Tutores -->
+                <h5 class="text-secondary border-bottom pb-2 mb-3 mt-4">4. Grupo Familiar / Responsables</h5>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Padre:</strong> {{ alumno.ape_padre or '-' }} <span class="text-muted font-monospace">(DNI: {{ alumno.dni_padre or '-' }})</span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Madre:</strong> {{ alumno.ape_madre or '-' }} <span class="text-muted font-monospace">(DNI: {{ alumno.dni_madre or '-' }})</span>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Tutor / Responsable Legal:</strong> {{ alumno.ape_tutor or '-' }} <span class="text-muted font-monospace">(DNI: {{ alumno.dni_tutor or '-' }})</span>
+                    </div>
+                </div>
+
+                <!-- Botones de Acción inferior -->
+                <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                    <a href="/principal" class="btn btn-secondary">← Volver al Listado</a>
+
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('editar_alumno', id_alumno=alumno.id_alumno) }}" class="btn btn-warning">Editar Ficha</a>
+
+                        <form action="{{ url_for('eliminar_alumno', id_alumno=alumno.id_alumno) }}" method="POST" onsubmit="return confirm('¿Estás seguro de eliminar este alumno del registro?');">
+                            <button type="submit" class="btn btn-danger">Eliminar Alumno</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
