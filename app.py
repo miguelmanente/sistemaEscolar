@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import csv
 import io
+from flask import Flask, render_template, request, redirect, url_for, session, flash
 
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_super_segura'  # Necesario para el login
@@ -115,8 +116,9 @@ def importar_alumnos():
         return redirect(url_for('login'))
         
     if request.method == 'POST':
-        if 'archivo_csv' not in request.files:
-            return "No se seleccionó ningún archivo. <a href='javascript:history.back()'>Volver</a>"
+        if 'archivo_csv' not in request.files or request.files['archivo_csv'].filename == '':
+            flash("No se seleccionó ningún archivo CSV válido.", "danger")
+            return redirect(url_for('importar_alumnos'))
             
         archivo = request.files['archivo_csv']
         
@@ -127,58 +129,64 @@ def importar_alumnos():
             stream = io.StringIO(archivo.stream.read().decode("utf-8"), newline=None)
             csv_reader = csv.reader(stream)
             
-            # Saltamos la cabecera (la primera fila con los títulos)
+            # Saltamos la cabecera (títulos)
             next(csv_reader, None) 
             
             registros_agregados = 0
             
             for fila in csv_reader:
-                # Verificamos que al menos tenga los datos mínimos (Apellido, Nombre, DNI)
                 if len(fila) < 3:
                     continue
                     
-                # 1. Datos principales
-                apellido_limpio = fila[0].strip().title() if len(fila) > 0 and fila[0] else ''
-                nombre_limpio = fila[1].strip().title() if len(fila) > 1 and fila[1] else ''
-                
+                # 1. Validación estricta de DNI
                 dni_ingresado = fila[2].strip() if len(fila) > 2 else ''
                 dni_limpio = dni_ingresado.replace('.', '')
                 
-                # Validamos el DNI
                 if not dni_limpio.isdigit() or not (7 <= len(dni_limpio) <= 8):
-                    continue 
+                    continue # Salta los registros con DNI inválido
                 
                 # Verificamos duplicados por DNI
                 existe = Alumno.query.filter_by(dni=dni_limpio).first()
                 if existe:
                     continue
                 
-                # 2. Resto de los campos según tu orden exacto:
-                cuil = fila[3].strip() if len(fila) > 3 else ''
+                # 2. NORMALIZACIÓN DE TEXTOS (Primera en mayúscula, resto en minúscula)
+                apellido_limpio = fila[0].strip().title() if len(fila) > 0 and fila[0] else ''
+                nombre_limpio = fila[1].strip().title() if len(fila) > 1 and fila[1] else ''
+                
+                # 3. Limpieza de CUIL (quitamos guiones y espacios por si vienen tipeados así)
+                cuil_ingresado = fila[3].strip() if len(fila) > 3 else ''
+                cuil_limpio = cuil_ingresado.replace('-', '').replace(' ', '')
+                
                 sexo = fila[4].strip() if len(fila) > 4 else 'Otro'
                 edad_val = fila[5].strip() if len(fila) > 5 and fila[5].isdigit() else None
                 fecha_texto = fila[6].strip() if len(fila) > 6 else ''
+                
                 telefono = fila[7].strip() if len(fila) > 7 else ''
                 correo = fila[8].strip() if len(fila) > 8 else ''
+                
+                # Normalizamos localidad y dirección
                 localidad = fila[9].strip().title() if len(fila) > 9 and fila[9] else ''
-                direccion = fila[10].strip() if len(fila) > 10 else ''
+                direccion = fila[10].strip().title() if len(fila) > 10 and fila[10] else ''
                 
                 escuela_ant = fila[11].strip() if len(fila) > 11 else ''
                 
-                # 3. Datos de padres y tutores
+                # Normalizamos apellidos de padres y tutores
                 ape_padre = fila[12].strip().title() if len(fila) > 12 and fila[12] else ''
                 dni_padre = fila[13].strip().replace('.', '') if len(fila) > 13 else ''
+                
                 ape_madre = fila[14].strip().title() if len(fila) > 14 and fila[14] else ''
                 dni_madre = fila[15].strip().replace('.', '') if len(fila) > 15 else ''
+                
                 ape_tutor = fila[16].strip().title() if len(fila) > 16 and fila[16] else ''
                 dni_tutor = fila[17].strip().replace('.', '') if len(fila) > 17 else ''
 
-                # Creamos el objeto alumno
+                # Creamos el objeto alumno totalmente normalizado
                 nuevo = Alumno(
                     apellido=apellido_limpio,
                     nombre=nombre_limpio,
                     dni=dni_limpio,
-                    cuil=cuil,
+                    cuil=cuil_limpio,
                     sexo=sexo,
                     edad=edad_val,
                     fecha_nacimiento=parsear_fecha(fecha_texto),
@@ -198,7 +206,9 @@ def importar_alumnos():
                 registros_agregados += 1
                 
             db.session.commit()
-            return f"¡Importación exitosa! Se agregaron {registros_agregados} alumnos completos a la base de datos. <a href='{url_for('principal')}'>Volver al inicio</a>"
+           # Usamos flash para enviar el mensaje de éxito a la pantalla principal
+            flash(f"¡Importación exitosa! Se procesaron y agregaron {registros_agregados} alumnos correctamente.", "success")
+            return redirect(url_for('principal'))
             
     return render_template('importar.html')
 # ----------------------------------------------------------------------------------------
@@ -268,6 +278,8 @@ def editar_alumno(id_alumno):
     alumno = Alumno.query.get_or_404(id_alumno)
 
     if request.method == 'POST':
+
+        
         # 1. Validación de DNI al modificar
         dni_ingresado = request.form.get('dni', '').strip()
         dni_limpio = dni_ingresado.replace('.', '')
