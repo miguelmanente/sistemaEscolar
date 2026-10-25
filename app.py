@@ -124,50 +124,81 @@ def importar_alumnos():
             return "El archivo no tiene nombre. <a href='javascript:history.back()'>Volver</a>"
             
         if archivo and archivo.filename.endswith('.csv'):
-            # Leemos el archivo decodificándolo en UTF-8
             stream = io.StringIO(archivo.stream.read().decode("utf-8"), newline=None)
             csv_reader = csv.reader(stream)
             
-            # Opcional: Si tu CSV tiene cabecera (Título en la primera línea), la saltamos
+            # Saltamos la cabecera (la primera fila con los títulos)
             next(csv_reader, None) 
             
             registros_agregados = 0
-            errores = []
             
             for fila in csv_reader:
-                # Suponemos el orden de columnas en el CSV: 
-                # [0] Apellido, [1] Nombre, [2] DNI, [3] Sexo, [4] Fecha Nacimiento (AAAA-MM-DD o DD/MM/AAAA)
+                # Verificamos que al menos tenga los datos mínimos (Apellido, Nombre, DNI)
                 if len(fila) < 3:
                     continue
                     
-                apellido_limpio = fila[0].strip().title()
-                nombre_limpio = fila[1].strip().title()
-                dni_limpio = fila[2].replace('.', '').strip()
-                sexo_limpio = fila[3].strip() if len(fila) > 3 else 'Otro'
-                fecha_texto = fila[4].strip() if len(fila) > 4 else ''
+                # 1. Datos principales
+                apellido_limpio = fila[0].strip().title() if len(fila) > 0 and fila[0] else ''
+                nombre_limpio = fila[1].strip().title() if len(fila) > 1 and fila[1] else ''
                 
-                # Validamos el DNI con la misma regla estricta
+                dni_ingresado = fila[2].strip() if len(fila) > 2 else ''
+                dni_limpio = dni_ingresado.replace('.', '')
+                
+                # Validamos el DNI
                 if not dni_limpio.isdigit() or not (7 <= len(dni_limpio) <= 8):
-                    continue # Salta los registros con DNI inválido para no romper la base
+                    continue 
                 
-                # Verificamos si el DNI ya existe para no duplicarlo
+                # Verificamos duplicados por DNI
                 existe = Alumno.query.filter_by(dni=dni_limpio).first()
                 if existe:
                     continue
                 
+                # 2. Resto de los campos según tu orden exacto:
+                cuil = fila[3].strip() if len(fila) > 3 else ''
+                sexo = fila[4].strip() if len(fila) > 4 else 'Otro'
+                edad_val = fila[5].strip() if len(fila) > 5 and fila[5].isdigit() else None
+                fecha_texto = fila[6].strip() if len(fila) > 6 else ''
+                telefono = fila[7].strip() if len(fila) > 7 else ''
+                correo = fila[8].strip() if len(fila) > 8 else ''
+                localidad = fila[9].strip().title() if len(fila) > 9 and fila[9] else ''
+                direccion = fila[10].strip() if len(fila) > 10 else ''
+                
+                escuela_ant = fila[11].strip() if len(fila) > 11 else ''
+                
+                # 3. Datos de padres y tutores
+                ape_padre = fila[12].strip().title() if len(fila) > 12 and fila[12] else ''
+                dni_padre = fila[13].strip().replace('.', '') if len(fila) > 13 else ''
+                ape_madre = fila[14].strip().title() if len(fila) > 14 and fila[14] else ''
+                dni_madre = fila[15].strip().replace('.', '') if len(fila) > 15 else ''
+                ape_tutor = fila[16].strip().title() if len(fila) > 16 and fila[16] else ''
+                dni_tutor = fila[17].strip().replace('.', '') if len(fila) > 17 else ''
+
                 # Creamos el objeto alumno
                 nuevo = Alumno(
                     apellido=apellido_limpio,
                     nombre=nombre_limpio,
                     dni=dni_limpio,
-                    sexo=sexo_limpio,
-                    fecha_nacimiento=parsear_fecha(fecha_texto)
+                    cuil=cuil,
+                    sexo=sexo,
+                    edad=edad_val,
+                    fecha_nacimiento=parsear_fecha(fecha_texto),
+                    telefono=telefono,
+                    correo=correo,
+                    localidad=localidad,
+                    direccion=direccion,
+                    escuela_anterior=escuela_ant,
+                    ape_padre=ape_padre,
+                    dni_padre=dni_padre,
+                    ape_madre=ape_madre,
+                    dni_madre=dni_madre,
+                    ape_tutor=ape_tutor,
+                    dni_tutor=dni_tutor
                 )
                 db.session.add(nuevo)
                 registros_agregados += 1
                 
             db.session.commit()
-            return f"¡Importación exitosa! Se agregaron {registros_agregados} alumnos nuevos a la base de datos. <a href='{url_for('principal')}'>Volver al inicio</a>"
+            return f"¡Importación exitosa! Se agregaron {registros_agregados} alumnos completos a la base de datos. <a href='{url_for('principal')}'>Volver al inicio</a>"
             
     return render_template('importar.html')
 # ----------------------------------------------------------------------------------------
@@ -198,8 +229,10 @@ def nuevo_alumno():
         dni_limpio = dni_ingresado.replace('.', '')
         
         if not dni_limpio.isdigit() or not (7 <= len(dni_limpio) <= 8):
-            return "Error: El DNI debe contener solo números (entre 7 y 8 dígitos). <a href='javascript:history.back()'>Volver</a>"
-
+            error_msg = "El DNI debe contener solo números (entre 7 y 8 dígitos)."
+            # Recargamos el formulario pasándole el error y conservando lo que escribió
+            return render_template('form_alumno.html', alumno=None, error=error_msg, fecha_str=request.form.get('fecha_nacimiento', ''))
+        
         nuevo = Alumno(
             apellido=normalizar_texto(request.form['apellido']),
             nombre=normalizar_texto(request.form['nombre']),
@@ -240,8 +273,10 @@ def editar_alumno(id_alumno):
         dni_limpio = dni_ingresado.replace('.', '')
         
         if not dni_limpio.isdigit() or not (7 <= len(dni_limpio) <= 8):
-            return "Error: El DNI debe contener solo números (entre 7 y 8 dígitos). <a href='javascript:history.back()'>Volver</a>"
-    
+            error_msg = "El DNI debe contener solo números (entre 7 y 8 dígitos)."
+            fecha_str_actual = request.form.get('fecha_nacimiento', '')
+            return render_template('form_alumno.html', alumno=alumno, error=error_msg, fecha_str=fecha_str_actual)
+        
     if request.method == 'POST':
         alumno.apellido = normalizar_texto(request.form['apellido'])
         alumno.nombre = normalizar_texto(request.form['nombre'])
