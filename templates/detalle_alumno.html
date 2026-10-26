@@ -113,15 +113,12 @@
                         <form action="{{ url_for('eliminar_alumno', id_alumno=alumno.id_alumno) }}" method="POST" onsubmit="return confirm('¿Estás seguro de eliminar este alumno del registro?');">
                             <button type="submit" class="btn btn-danger">Eliminar Alumno</button>
                         </form>
-
-                            <!-- Botones del formulario -->
-                              <!-- BOTÓN PARA GENERAR EL PDF (Solo aparece si el alumno ya está guardado/editando) -->
+                            <!-- BOTÓN PARA GENERAR EL PDF (Solo aparece si el alumno ya está guardado/editando) -->
                             {% if alumno %}
                             <a href="{{ url_for('generar_ficha_pdf', id_alumno=alumno.id_alumno) }}" class="btn btn-danger float-end" target="_blank">
                                 📄 Generar Ficha PDF
                             </a>
-                            {% endif %}
-                        
+                            {% endif %} 
                     </div>
                 </div>
             </div>

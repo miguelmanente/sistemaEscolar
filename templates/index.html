@@ -4,6 +4,17 @@
     <meta charset="UTF-8">
     <title>Panel Principal - Sistema Escolar</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        /* Forzamos el color de fondo y texto tanto en la fila como en sus celdas */
+        tr.tabla-seleccionada, 
+        tr.tabla-seleccionada > td, 
+        tr.tabla-seleccionada > th {
+            background-color: #cfe2ff !important;
+            color: #084298 !important;
+            font-weight: bold !important;
+        }
+    </style>
 </head>
 <body class="bg-light">
 
@@ -86,56 +97,87 @@
 
 <!-- Todo tu contenido HTML de la tabla y los botones anteriores... -->
 
-
 <script>
-    document.addEventListener('keydown', function(event) {
-        // Si el usuario está escribiendo en un input, buscador o textarea, no interferimos
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+document.addEventListener("DOMContentLoaded", function() {
+    const tabla = document.querySelector("table");
+    if (!tabla) return;
+    
+    const filas = Array.from(tabla.querySelectorAll("tbody tr"));
+    if (filas.length === 0) return;
+    
+    let indiceActual = -1;
+
+    function seleccionarFila(index) {
+        if (index < 0 || index >= filas.length) return;
+        
+        // Limpiamos selección anterior
+        filas.forEach(f => f.classList.remove("tabla-seleccionada"));
+        
+        // Marcamos la nueva
+        indiceActual = index;
+        const filaSeleccionada = filas[indiceActual];
+        filaSeleccionada.classList.add("tabla-seleccionada");
+        
+        // Scroll automático
+        filaSeleccionada.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    // Clic del mouse en cualquier fila
+    filas.forEach((fila, index) => {
+        fila.addEventListener("click", function() {
+            seleccionarFila(index);
+        });
+    });
+
+    // Control por teclado
+    document.addEventListener("keydown", function(e) {
+        if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) {
             return;
         }
 
-        const letra = event.key.toLowerCase();
-        
-        if (letra.length !== 1 || letra < 'a' || letra > 'z') {
-            return;
+        // Flecha Abajo
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+            let siguiente = indiceActual < filas.length - 1 ? indiceActual + 1 : 0;
+            seleccionarFila(siguiente);
         }
-
-        const filas = document.querySelectorAll('table tbody tr');
-        
-        for (let fila of filas) {
-            const celdaApellido = fila.cells[1]; // Ajusta a cells[1] si el apellido está en la segunda columna
+        // Flecha Arriba
+        else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            let anterior = indiceActual > 0 ? indiceActual - 1 : filas.length - 1;
+            seleccionarFila(anterior);
+        }
+        // Búsqueda por letra (Apunta a la celda 1, donde está el apellido)
+        else if (e.key.length === 1 && /^[a-zA-ZáéíóúÁÉÍÓÚñÑ]$/.test(e.key)) {
+            e.preventDefault();
+            const letra = e.key.toLowerCase();
             
-            if (celdaApellido) {
-                const apellidoTexto = celdaApellido.textContent.trim().toLowerCase();
+            let inicio = (indiceActual + 1) % filas.length;
+            let encontrado = -1;
+
+            for (let i = 0; i < filas.length; i++) {
+                let indexVerificar = (inicio + i) % filas.length;
+                let celdas = filas[indexVerificar].querySelectorAll("td");
                 
-                if (apellidoTexto.startsWith(letra)) {
-                    // 1. Hacemos scroll suave hasta la fila
-                    fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                if (celdas.length > 1) { // Aseguramos que tenga al menos 2 columnas
+                    // 🎯 AQUÍ ESTÁ EL CAMBIO: leemos celdas[1] que corresponde al Apellido
+                    let textoCelda = celdas[1].textContent.trim().toLowerCase();
                     
-                    // 2. Pintamos CADA CELDA de la fila para ganarle a los estilos de Bootstrap
-                    const celdas = fila.querySelectorAll('td');
-                    
-                    celdas.forEach(celda => {
-                        celda.style.backgroundColor = '#0d6efd'; // Azul brillante
-                        celda.style.color = '#ffffff';            // Texto blanco
-                        celda.style.fontWeight = 'bold';          // Negrita
-                    });
-                    
-                    // 3. Restauramos los valores originales después de 2.5 segundos
-                    setTimeout(() => {
-                        celdas.forEach(celda => {
-                            celda.style.backgroundColor = '';
-                            celda.style.color = '';
-                            celda.style.fontWeight = '';
-                        });
-                    }, 2500); 
-                    
-                    break; 
+                    if (textoCelda.startsWith(letra)) {
+                        encontrado = indexVerificar;
+                        break;
+                    }
                 }
+            }
+
+            if (encontrado !== -1) {
+                seleccionarFila(encontrado);
             }
         }
     });
+});
 </script>
+
 
 <!-- Bootstrap JS Bundle (¡Este script hace funcionar el botón X, modales y alertas!) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

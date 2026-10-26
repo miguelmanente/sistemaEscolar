@@ -110,7 +110,7 @@ def principal():
         return redirect(url_for('login'))
         
     # Consultamos todos los alumnos de la base de datos
-    lista_alumnos = Alumno.query.all()
+    lista_alumnos = Alumno.query.order_by(Alumno.apellido.asc(), Alumno.nombre.asc()).all()
     return render_template('index.html', alumnos=lista_alumnos)
 #---------------------------------------------------------------------------------------------------
 
