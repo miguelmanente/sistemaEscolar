@@ -4,6 +4,12 @@ from datetime import datetime
 import csv
 import io
 from flask import Flask, render_template, request, redirect, url_for, session, flash
+import os
+from flask import send_file
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
 
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_super_segura'  # Necesario para el login
@@ -326,6 +332,139 @@ def eliminar_alumno(id_alumno):
     db.session.delete(alumno)
     db.session.commit()
     return redirect(url_for('principal'))
+
+# ----------------- REPORTE PDF FICHA ALUMNO -------------------------------------------------
+@app.route('/alumno/pdf/<int:id_alumno>')
+def generar_ficha_pdf(id_alumno):
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+        
+    alumno = Alumno.query.get_or_404(id_alumno)
+    
+    # 1. Crear las carpetas si no existen
+    carpeta = os.path.join('reportes', 'ficha personal')
+    os.makedirs(carpeta, exist_ok=True)
+    
+    nombre_archivo = f"Ficha_{alumno.dni}_{alumno.apellido}.pdf"
+    ruta_completa = os.path.join(carpeta, nombre_archivo)
+    
+    # 2. Configurar el documento (márgenes de 1.5 cm)
+    doc = SimpleDocTemplate(
+        ruta_completa, 
+        pagesize=letter,
+        rightMargin=40, leftMargin=40,
+        topMargin=40, bottomMargin=40
+    )
+    elementos = []
+    
+    # Estilos personalizados
+    estilos = getSampleStyleSheet()
+    
+    # Estilo para títulos de sección con fondo o color destacado
+    estilo_titulo_principal = ParagraphStyle(
+        'TituloPrincipal',
+        parent=estilos['Heading1'],
+        fontSize=16,
+        textColor=colors.HexColor('#1a365d'), # Azul marino institucional
+        alignment=1, # Centrado
+        spaceAfter=15
+    )
+    
+    estilo_seccion = ParagraphStyle(
+        'TituloSeccion',
+        parent=estilos['Heading2'],
+        fontSize=11,
+        textColor=colors.HexColor('#ffffff'), # Texto blanco
+        spaceBefore=0,
+        spaceAfter=0
+    )
+    
+    estilo_celda = ParagraphStyle(
+        'TextoCelda',
+        parent=estilos['Normal'],
+        fontSize=9.5,
+        textColor=colors.HexColor('#2d3748')
+    )
+    
+    estilo_etiqueta = ParagraphStyle(
+        'TextoEtiqueta',
+        parent=estilos['Normal'],
+        fontSize=9.5,
+        fontName='Helvetica-Bold',
+        textColor=colors.HexColor('#1a202c')
+    )
+
+    # --- ENCABEZADO ---
+    elementos.append(Paragraph("SISTEMA ESCOLAR - FICHA PERSONAL", estilo_titulo_principal))
+    elementos.append(Spacer(1, 10))
+
+    # Función auxiliar para crear tablas con estilo profesional
+    def crear_tabla_seccion(titulo, datos):
+        # Fila de título de la sección
+        tabla_datos = [[Paragraph(f"<b>{titulo}</b>", estilo_seccion), '']]
+        for etiqueta, valor in datos:
+            tabla_datos.append([
+                Paragraph(etiqueta, estilo_etiqueta),
+                Paragraph(str(valor) if valor else '-', estilo_celda)
+            ])
+            
+        t = Table(tabla_datos, colWidths=[150, 384])
+        t.setStyle(TableStyle([
+            ('SPAN', (0, 0), (1, 0)), # Une las dos columnas para el título de la sección
+            ('BACKGROUND', (0, 0), (1, 0), colors.HexColor('#2b6cb0')), # Fondo azul para la cabecera de sección
+            ('BOTTOMPADDING', (0, 0), (1, 0), 6),
+            ('TOPPADDING', (0, 0), (1, 0), 6),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#f7fafc')), # Fondo gris muy claro para las celdas
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cbd5e0')), # Bordes grises finos
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+            ('TOPPADDING', (0, 1), (-1, -1), 5),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        return t
+
+    # --- SECCIÓN 1: DATOS PERSONALES ---
+    fecha_nac = alumno.fecha_nacimiento.strftime('%d/%m/%Y') if alumno.fecha_nacimiento else '-'
+    datos_personales = [
+        ("Apellido y Nombre:", f"{alumno.apellido}, {alumno.nombre}"),
+        ("DNI:", alumno.dni),
+        ("CUIL:", alumno.cuil or '-'),
+        ("Sexo:", alumno.sexo or '-'),
+        ("Edad:", alumno.edad or '-'),
+        ("Fecha de Nacimiento:", fecha_nac)
+    ]
+    elementos.append(crear_tabla_seccion("DATOS PERSONALES", datos_personales))
+    elementos.append(Spacer(1, 12))
+
+    # --- SECCIÓN 2: CONTACTO Y UBICACIÓN ---
+    datos_contacto = [
+        ("Teléfono:", alumno.telefono or '-'),
+        ("Correo Electrónico:", alumno.correo or '-'),
+        ("Dirección:", alumno.direccion or '-'),
+        ("Localidad:", alumno.localidad or '-'),
+        ("Escuela Anterior:", alumno.escuela_anterior or '-')
+    ]
+    elementos.append(crear_tabla_seccion("INFORMACIÓN DE CONTACTO", datos_contacto))
+    elementos.append(Spacer(1, 12))
+
+    # --- SECCIÓN 3: FAMILIA / TUTORES ---
+    datos_familia = [
+        ("Apellido Padre:", alumno.ape_padre or '-'),
+        ("DNI Padre:", alumno.dni_padre or '-'),
+        ("Apellido Madre:", alumno.ape_madre or '-'),
+        ("DNI Madre:", alumno.dni_madre or '-'),
+        ("Apellido Tutor:", alumno.ape_tutor or '-'),
+        ("DNI Tutor:", alumno.dni_tutor or '-')
+    ]
+    elementos.append(crear_tabla_seccion("DATOS DE PADRES / TUTORES", datos_familia))
+
+    # Construir el PDF
+    doc.build(elementos)
+    
+    return send_file(ruta_completa, as_attachment=True)
+# ------------------------------------------------------------------------------------------------------------
+
 
 if __name__ == '__main__':
     app.run(debug=True)
