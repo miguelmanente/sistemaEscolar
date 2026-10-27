@@ -10,6 +10,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_super_segura'  # Necesario para el login
@@ -44,6 +45,27 @@ class Alumno(db.Model):
     ape_tutor = db.Column(db.String(100))
     dni_tutor = db.Column(db.String(20))
 
+class Usuario(db.Model):
+    __tablename__ = 'usuario'  # <-- Acá le dice que use la tabla 'usuario' que creaste en pgAdmin
+
+    id = db.Column(db.Integer, primary_key=True)
+    usuario = db.Column(db.String(80), unique=True, nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+
+class Curso(db.Model):
+    __tablename__ = 'cursos'
+    
+    id_curso = db.Column(db.Integer, primary_key=True)
+    nombre_curso = db.Column(db.String(100), nullable=False)
+    # Vinculamos con la tabla alumnos usando su clave primaria id_alumno
+    id_alumno = db.Column(db.Integer, db.ForeignKey('alumnos.id_alumno'), nullable=False)
+    especialidad = db.Column(db.String(100), nullable=False)
+    turno = db.Column(db.String(50), nullable=False)
+    profesor_titular = db.Column(db.String(100), nullable=False)
+    profesor_suplente = db.Column(db.String(100), nullable=True)
+    
+    # Esto nos permite acceder a los datos del alumno directamente desde el curso (ej: curso.alumno.apellido)
+    alumno = db.relationship('Alumno', backref=db.backref('cursos', lazy=True))
 # ==========================================
 # 2. AQUÍ ES DONDE PONEMOS LAS FUNCIONES AUXILIARES
 # ==========================================
@@ -80,8 +102,10 @@ def normalizar_texto(texto):
             resultado.append(palabra.capitalize())
     return " ".join(resultado)
 #-----------------------------------------------------------------------------
+# Clave secreta que manejarán únicamente Dirección y Secretaría
+CLAVE_ADMIN_INSTITUCIONAL = "Secretaria2026*" 
 
-# Ruta inicial (Te llevará al Login)
+# Ruta inicial
 @app.route('/')
 def home():
     return redirect(url_for('login'))
@@ -89,19 +113,53 @@ def home():
 # Ruta del Login
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    error = None  # Variable para el mensaje de error
     if request.method == 'POST':
-        usuario = request.form['usuario']
+        nombre_usuario = request.form['usuario'].strip()
         password = request.form['password']
         
-        # Aquí puedes poner un usuario y contraseña fijo por ahora
-        if usuario == "admin" and password == "1234":
-            session['usuario'] = usuario
+        # Buscamos el usuario en la base de datos
+        user = Usuario.query.filter_by(usuario=nombre_usuario).first()
+        
+        # Verificamos si existe y si coincide la contraseña
+        if user and check_password_hash(user.password, password):
+            session['usuario'] = user.usuario
             return redirect(url_for('principal'))
         else:
-            return "Usuario o contraseña incorrectos. <a href='/login'>Volver</a>"
+            error = "Usuario o contraseña incorrectos."
             
-    return render_template('login.html')
-#-----------------------------------------------------------------------------
+    return render_template('login.html', error=error)
+
+# Ruta de Registro con Clave de Autorización
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    error = None
+    exito = None
+    if request.method == 'POST':
+        nombre_usuario = request.form['usuario'].strip()
+        password = request.form['password']
+        admin_code = request.form['admin_code'].strip()
+        
+        # 1. Validar la clave institucional
+        if admin_code != CLAVE_ADMIN_INSTITUCIONAL:
+            error = "La clave de Dirección/Secretaría es incorrecta."
+        
+        # 2. Verificar si el usuario ya existe
+        elif Usuario.query.filter_by(usuario=nombre_usuario).first():
+            error = "El nombre de usuario ya está registrado."
+        
+        else:
+            # 3. Hashear la contraseña y guardar en la base de datos
+            password_encriptada = generate_password_hash(password)
+            nuevo_usuario = Usuario(usuario=nombre_usuario, password=password_encriptada)
+            
+            db.session.add(nuevo_usuario)
+            db.session.commit()
+            
+            exito = "¡Usuario registrado con éxito!"
+            
+    return render_template('register.html', error=error, exito=exito)
+#-----------------------------------------------------------------------------|
 
 # Ruta de la página principal (Menú con pestañas)
 @app.route('/principal')
@@ -465,6 +523,80 @@ def generar_ficha_pdf(id_alumno):
     return send_file(ruta_completa, as_attachment=True)
 # ------------------------------------------------------------------------------------------------------------
 
+# ----------------------------Creación de cursos y asignación de alumnos a cursos---------------------------------------------
+@app.route('/cursos')
+def listar_cursos():
+    if 'usuario' not in session:
+        return redirect(url_for('login'))
+    
+    # Consultamos los cursos y los ordenamos por nombre_curso y especialidad,
+    # haciendo un 'join' implícito o explícito con la tabla Alumnos
+    cursos = Curso.query.join(Alumno).order_by(Curso.nombre_curso, Curso.especialidad).all()
+    
+    return render_template('cursos.html', cursos=cursos)
+# ------------------------------------------------------------------------------------------------------------
+
+# Ruta para crear un nuevo curso
+@app.route('/cursos/nuevo', methods=['GET', 'POST'])
+def nuevo_curso():
+    if request.method == 'POST':
+        nombre_curso = request.form['nombre_curso'].strip()
+        id_alumno = request.form['id_alumno']
+        especialidad = request.form['especialidad'].strip()
+        turno = request.form['turno'].strip()
+        profesor_titular = request.form['profesor_titular'].strip()
+        profesor_suplente = request.form['profesor_suplente'].strip()
+        
+        # Guardar en la base de datos
+        nuevo = Curso(
+            nombre_curso=nombre_curso,
+            id_alumno=id_alumno,
+            especialidad=especialidad,
+            turno=turno,
+            profesor_titular=profesor_titular,
+            profesor_suplente=profesor_suplente if profesor_suplente else None
+        )
+        db.session.add(nuevo)
+        db.session.commit()
+        return redirect(url_for('listar_cursos'))
+    
+    # Pasamos la lista de alumnos ordenados por apellido para seleccionarlos fácilmente
+    alumnos = Alumno.query.order_by(Alumno.apellido).all()
+    return render_template('form_curso.html', alumnos=alumnos)
+#---------------------------------------------------------------------------------------------------
+
+# Ruta para editar un curso existente
+@app.route('/cursos/editar/<int:id_curso>', methods=['GET', 'POST'])
+def editar_curso(id_curso):
+    # Buscamos el curso o devolvemos error 404 si no existe
+    curso = Curso.query.get_or_404(id_curso)
+    
+    if request.method == 'POST':
+        curso.nombre_curso = request.form['nombre_curso'].strip()
+        curso.id_alumno = request.form['id_alumno']
+        curso.especialidad = request.form['especialidad'].strip()
+        curso.turno = request.form['turno'].strip()
+        curso.profesor_titular = request.form['profesor_titular'].strip()
+        
+        profesor_suplente = request.form['profesor_suplente'].strip()
+        curso.profesor_suplente = profesor_suplente if profesor_suplente else None
+        
+        db.session.commit()
+        return redirect(url_for('listar_cursos'))
+    
+    # Pasamos el curso actual y la lista de alumnos al formulario
+    alumnos = Alumno.query.order_by(Alumno.apellido).all()
+    return render_template('form_curso.html', curso=curso, alumnos=alumnos)
+# -----------------------------------------------------------------------------------------------------------
+
+# Ruta para eliminar un curso
+@app.route('/cursos/eliminar/<int:id_curso>', methods=['POST'])
+def eliminar_curso(id_curso):
+    curso = Curso.query.get_or_404(id_curso)
+    db.session.delete(curso)
+    db.session.commit()
+    return redirect(url_for('listar_cursos'))
+# ------------------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
     app.run(debug=True)

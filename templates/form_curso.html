@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ "Editar Curso" if curso else "Nuevo Curso" }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <!-- BARRA DE MENÚ -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('principal') }}">Sistema Escolar</a>
+            <div class="collapse navbar-collapse">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('listar_cursos') }}">Cursos</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- FORMULARIO -->
+    <div class="container mt-5" style="max-width: 600px;">
+        <div class="card shadow">
+            <div class="card-header bg-dark text-white">
+                <h4 class="mb-0">{{ "Editar Curso" if curso else "Registrar Nuevo Curso" }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    
+                    <div class="mb-3">
+                        <label for="nombre_curso" class="form-label">Nombre del Curso:</label>
+                        <input type="text" class="form-control" id="nombre_curso" name="nombre_curso" value="{{ curso.nombre_curso if curso else '' }}" required placeholder="Ej: 3er Año Informática">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="id_alumno" class="form-label">Seleccionar Alumno:</label>
+                        <select class="form-select" id="id_alumno" name="id_alumno" required>
+                            <option value="">-- Seleccione un alumno --</option>
+                            {% for alumno in alumnos %}
+                                <option value="{{ alumno.id_alumno }}" {% if curso and curso.id_alumno == alumno.id_alumno %}selected{% endif %}>
+                                    {{ alumno.apellido }}, {{ alumno.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="especialidad" class="form-label">Especialidad:</label>
+                        <input type="text" class="form-control" id="especialidad" name="especialidad" value="{{ curso.especialidad if curso else '' }}" required placeholder="Ej: Programación">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="turno" class="form-label">Turno:</label>
+                        <select class="form-select" id="turno" name="turno" required>
+                            <option value="Mañana" {% if curso and curso.turno == 'Mañana' %}selected{% endif %}>Mañana</option>
+                            <option value="Tarde" {% if curso and curso.turno == 'Tarde' %}selected{% endif %}>Tarde</option>
+                            <option value="Noche" {% if curso and curso.turno == 'Noche' %}selected{% endif %}>Noche</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="profesor_titular" class="form-label">Profesor Titular:</label>
+                        <input type="text" class="form-control" id="profesor_titular" name="profesor_titular" value="{{ curso.profesor_titular if curso else '' }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="profesor_suplente" class="form-label">Profesor Suplente (Opcional):</label>
+                        <input type="text" class="form-control" id="profesor_suplente" name="profesor_suplente" value="{{ curso.profesor_suplente if curso and curso.profesor_suplente else '' }}">
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('listar_cursos') }}" class="btn btn-secondary">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">{{ "Actualizar Curso" if curso else "Guardar Curso" }}</button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
