@@ -57,21 +57,17 @@
                         <select class="form-select" id="turno" name="turno" required>
                             <option value="Mañana" {% if curso and curso.turno == 'Mañana' %}selected{% endif %}>Mañana</option>
                             <option value="Tarde" {% if curso and curso.turno == 'Tarde' %}selected{% endif %}>Tarde</option>
+                            <option value="Vespertino" {% if curso and curso.turno == 'Vespertino' %}selected{% endif %}>Vespertino</option>
                             <option value="Noche" {% if curso and curso.turno == 'Noche' %}selected{% endif %}>Noche</option>
                         </select>
                     </div>
 
                     <div class="mb-3">
-                        <label for="profesor_titular" class="form-label">Profesor Titular:</label>
-                        <input type="text" class="form-control" id="profesor_titular" name="profesor_titular" value="{{ curso.profesor_titular if curso else '' }}" required>
+                        <label for="anio_lectivo" class="form-label">Año Lectivo:</label>
+                        <input type="number" class="form-control" id="anio_lectivo" name="anio_lectivo" value="{{ curso.anio_lectivo if curso else 2026 }}" required>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="profesor_suplente" class="form-label">Profesor Suplente (Opcional):</label>
-                        <input type="text" class="form-control" id="profesor_suplente" name="profesor_suplente" value="{{ curso.profesor_suplente if curso and curso.profesor_suplente else '' }}">
-                    </div>
-
-                    <div class="d-flex justify-content-between">
+                   <div class="d-flex justify-content-between">
                         <a href="{{ url_for('listar_cursos') }}" class="btn btn-secondary">Cancelar</a>
                         <button type="submit" class="btn btn-primary">{{ "Actualizar Curso" if curso else "Guardar Curso" }}</button>
                     </div>

@@ -5,12 +5,13 @@ import csv
 import io
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 import os
-from flask import send_file
+from flask import send_file, make_response
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from werkzeug.security import generate_password_hash, check_password_hash
+
 
 app = Flask(__name__)
 app.secret_key = 'clave_secreta_super_segura'  # Necesario para el login
@@ -61,8 +62,7 @@ class Curso(db.Model):
     id_alumno = db.Column(db.Integer, db.ForeignKey('alumnos.id_alumno'), nullable=False)
     especialidad = db.Column(db.String(100), nullable=False)
     turno = db.Column(db.String(50), nullable=False)
-    profesor_titular = db.Column(db.String(100), nullable=False)
-    profesor_suplente = db.Column(db.String(100), nullable=True)
+    anio_lectivo = db.Column(db.Integer, nullable=False) # <- NUEVO CAMPO
     
     # Esto nos permite acceder a los datos del alumno directamente desde el curso (ej: curso.alumno.apellido)
     alumno = db.relationship('Alumno', backref=db.backref('cursos', lazy=True))
@@ -102,6 +102,8 @@ def normalizar_texto(texto):
             resultado.append(palabra.capitalize())
     return " ".join(resultado)
 #-----------------------------------------------------------------------------
+
+# ------------------------- LOGIN Y REGISTROS DE USUARIOS ---------------------------------------------
 # Clave secreta que manejarán únicamente Dirección y Secretaría
 CLAVE_ADMIN_INSTITUCIONAL = "Secretaria2026*" 
 
@@ -172,7 +174,7 @@ def principal():
     return render_template('index.html', alumnos=lista_alumnos)
 #---------------------------------------------------------------------------------------------------
 
-
+# ------------------------------------- ALUMNOS -----------------------------------------------------
 # ----------------  Ruta para importar alumnos desde un archivo CSV ---------------------------------
 @app.route('/importar_alumnos', methods=['GET', 'POST'])
 def importar_alumnos():
@@ -523,17 +525,29 @@ def generar_ficha_pdf(id_alumno):
     return send_file(ruta_completa, as_attachment=True)
 # ------------------------------------------------------------------------------------------------------------
 
-# ----------------------------Creación de cursos y asignación de alumnos a cursos---------------------------------------------
+# ------------------------------------------------ SECCIÓN CURSOS --------------------------------------------
+
+# Ruta para listar cursos filtrando por año lectivo (por defecto 2026)
 @app.route('/cursos')
 def listar_cursos():
-    if 'usuario' not in session:
-        return redirect(url_for('login'))
+    anio_actual = request.args.get('anio', 2026, type=int)
+    nombre_curso = request.args.get('curso', '').strip()
+    especialidad = request.args.get('especialidad', '').strip()
+
+    # Consulta base filtrando por año
+    query = Curso.query.filter_by(anio_lectivo=anio_actual)
+
+    # FILTRO EXACTO por curso (usando == en lugar de búsqueda flexible)
+    if nombre_curso:
+        query = query.filter(Curso.nombre_curso == nombre_curso)
+        
+    # Filtro por especialidad (si también quieres que sea exacto o lo dejamos flexible)
+    if especialidad:
+        query = query.filter(Curso.especialidad.ilike(f"%{especialidad}%"))
+
+    cursos = query.join(Alumno).order_by(Curso.nombre_curso, Alumno.apellido).all()
     
-    # Consultamos los cursos y los ordenamos por nombre_curso y especialidad,
-    # haciendo un 'join' implícito o explícito con la tabla Alumnos
-    cursos = Curso.query.join(Alumno).order_by(Curso.nombre_curso, Curso.especialidad).all()
-    
-    return render_template('cursos.html', cursos=cursos)
+    return render_template('cursos.html', cursos=cursos, anio_actual=anio_actual)
 # ------------------------------------------------------------------------------------------------------------
 
 # Ruta para crear un nuevo curso
@@ -544,31 +558,27 @@ def nuevo_curso():
         id_alumno = request.form['id_alumno']
         especialidad = request.form['especialidad'].strip()
         turno = request.form['turno'].strip()
-        profesor_titular = request.form['profesor_titular'].strip()
-        profesor_suplente = request.form['profesor_suplente'].strip()
+        # Corrección aquí:
+        anio_lectivo = request.form.get('anio_lectivo', type=int)
         
-        # Guardar en la base de datos
         nuevo = Curso(
             nombre_curso=nombre_curso,
             id_alumno=id_alumno,
             especialidad=especialidad,
             turno=turno,
-            profesor_titular=profesor_titular,
-            profesor_suplente=profesor_suplente if profesor_suplente else None
+            anio_lectivo=anio_lectivo
         )
         db.session.add(nuevo)
         db.session.commit()
-        return redirect(url_for('listar_cursos'))
+        return redirect(url_for('listar_cursos', anio=anio_lectivo))
     
-    # Pasamos la lista de alumnos ordenados por apellido para seleccionarlos fácilmente
     alumnos = Alumno.query.order_by(Alumno.apellido).all()
     return render_template('form_curso.html', alumnos=alumnos)
-#---------------------------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------------------------------
 
 # Ruta para editar un curso existente
 @app.route('/cursos/editar/<int:id_curso>', methods=['GET', 'POST'])
 def editar_curso(id_curso):
-    # Buscamos el curso o devolvemos error 404 si no existe
     curso = Curso.query.get_or_404(id_curso)
     
     if request.method == 'POST':
@@ -576,26 +586,109 @@ def editar_curso(id_curso):
         curso.id_alumno = request.form['id_alumno']
         curso.especialidad = request.form['especialidad'].strip()
         curso.turno = request.form['turno'].strip()
-        curso.profesor_titular = request.form['profesor_titular'].strip()
-        
-        profesor_suplente = request.form['profesor_suplente'].strip()
-        curso.profesor_suplente = profesor_suplente if profesor_suplente else None
+      # Corrección aquí:
+        anio_lectivo = request.form.get('anio_lectivo', type=int)
         
         db.session.commit()
-        return redirect(url_for('listar_cursos'))
+        return redirect(url_for('listar_cursos', anio=curso.anio_lectivo))
     
-    # Pasamos el curso actual y la lista de alumnos al formulario
     alumnos = Alumno.query.order_by(Alumno.apellido).all()
     return render_template('form_curso.html', curso=curso, alumnos=alumnos)
-# -----------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------------------------------------
 # Ruta para eliminar un curso
 @app.route('/cursos/eliminar/<int:id_curso>', methods=['POST'])
 def eliminar_curso(id_curso):
     curso = Curso.query.get_or_404(id_curso)
     db.session.delete(curso)
     db.session.commit()
-    return redirect(url_for('listar_cursos'))
+    return redirect(url_for('listar_cursos', anio=curso.anio_lectivo))
+# -----------------------------------------------------------------------------------------------
+
+# -------------------------------- REPORTE PDF CURSOS -------------------------------------------------
+@app.route('/cursos/reporte_pdf')
+def reporte_cursos_pdf():
+    anio = request.args.get('anio', 2026, type=int)
+    nombre_curso = request.args.get('curso', '').strip()
+    especialidad = request.args.get('especialidad', '').strip()
+
+    # Consulta base filtrando por año
+    query = Curso.query.filter_by(anio_lectivo=anio)
+
+    if nombre_curso:
+        query = query.filter(Curso.nombre_curso == nombre_curso)
+    if especialidad:
+        query = query.filter(Curso.especialidad.ilike(f"%{especialidad}%"))
+
+    cursos_filtrados = query.join(Alumno).order_by(Curso.nombre_curso, Alumno.apellido).all()
+
+    # --- 1. CREAR LA ESTRUCTURA DE CARPETAS ---
+    # Nombre de la subcarpeta según el filtro (si no ponen curso, se guarda en una carpeta "General")
+    carpeta_curso = nombre_curso if nombre_curso else "General"
+    
+    # Limpiamos caracteres inválidos para nombres de carpetas en Windows/Linux (por si usan barras, etc.)
+    carpeta_curso = "".join(c for c in carpeta_curso if c.isalnum() or c in (' ', '_', '-')).strip()
+    
+    # Ruta completa: reportes / [nombre_curso]
+    directorio = os.path.join('reportes', carpeta_curso)
+    os.makedirs(directorio, exist_ok=True)  # Crea la carpeta y subcarpeta si no existen
+
+    # Nombre único para el archivo basado en la fecha y hora actual para que no se pisen
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    nombre_archivo = f"reporte_{anio}_{timestamp}.pdf"
+    ruta_completa = os.path.join(directorio, nombre_archivo)
+
+    # --- 2. GENERAR EL PDF CON REPORTLAB ---
+    doc = SimpleDocTemplate(ruta_completa, pagesize=letter, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
+    elementos = []
+
+    styles = getSampleStyleSheet()
+    estilo_titulo = ParagraphStyle('TituloPDF', parent=styles['Heading1'], fontSize=16, alignment=1, spaceAfter=15)
+    estilo_subtitulo = ParagraphStyle('SubTituloPDF', parent=styles['Normal'], fontSize=10, alignment=1, spaceAfter=20, textColor=colors.gray)
+
+    elementos.append(Paragraph(f"<b>Sistema Escolar - Listado de Cursos</b>", estilo_titulo))
+    
+    filtro_texto = f"Ciclo Lectivo: {anio}"
+    if nombre_curso:
+        filtro_texto += f" | Curso: {nombre_curso}"
+    if especialidad:
+        filtro_texto += f" | Especialidad: {especialidad}"
+    elementos.append(Paragraph(filtro_texto, estilo_subtitulo))
+    elementos.append(Spacer(1, 10))
+
+    data = [["Curso", "Especialidad", "Alumno (Apellido y Nombres)", "Turno"]]
+
+    for c in cursos_filtrados:
+        data.append([
+            c.nombre_curso,
+            c.especialidad,
+            f"{c.alumno.apellido}, {c.alumno.nombre}",
+            c.turno
+        ])
+
+    if len(cursos_filtrados) == 0:
+        data.append(["-", "-", "No se encontraron registros con los filtros seleccionados.", "-"])
+
+    tabla = Table(data, colWidths=[90, 110, 220, 85])
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#343a40')),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('ALIGN', (0,0), (-1,-1), 'LEFT'),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0,0), (-1,0), 10),
+        ('BOTTOMPADDING', (0,0), (-1,0), 6),
+        ('BACKGROUND', (0,1), (-1,-1), colors.HexColor('#f8f9fa')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#dee2e6')),
+        ('FONTNAME', (0,1), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,1), (-1,-1), 9),
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    # --- 3. ENVIAR EL ARCHIVO AL NAVEGADOR PARA DESCARGA/VISUALIZACIÓN ---
+    return send_file(ruta_completa, as_attachment=False, mimetype='application/pdf')
 # ------------------------------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
