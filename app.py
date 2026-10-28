@@ -1,3 +1,6 @@
+# ======================================  M+ODULO app.py   ====================================
+
+# -------------------------------   LIBRERÍAS NECESARIAS ------------------------------------------------
 from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
@@ -11,6 +14,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from werkzeug.security import generate_password_hash, check_password_hash
+# --------------------------------------------------------------------------------------------------------
 
 
 app = Flask(__name__)
@@ -23,6 +27,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# ---------------------------- BASE DE DATOS Y SUS TABLAS -------------------------------------------------
 # Definimos el modelo de la tabla alumnos para que Python la entienda
 class Alumno(db.Model):
     __tablename__ = 'alumnos'
@@ -66,9 +71,11 @@ class Curso(db.Model):
     
     # Esto nos permite acceder a los datos del alumno directamente desde el curso (ej: curso.alumno.apellido)
     alumno = db.relationship('Alumno', backref=db.backref('cursos', lazy=True))
-# ==========================================
-# 2. AQUÍ ES DONDE PONEMOS LAS FUNCIONES AUXILIARES
-# ==========================================
+# --------------------------------------------------------------------------------------------------------
+
+# ======================================================================================================
+#                              FORMATEO DE FECHAS
+# =======================================================================================================
 def parsear_fecha(texto_fecha):
     if not texto_fecha:
         return None
@@ -84,8 +91,9 @@ def formatear_fecha(fecha_obj):
     if not fecha_obj:
         return ''
     return fecha_obj.strftime('%d/%m/%Y')
-#-----------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
 
+# ---------------------------- FUNCIONES AUXILIARES DE NORMALIZACIÓN DE TEXTOS --------------------------------
 # Función para normalizar el texto de nombres y apellidos
 def normalizar_texto(texto):
     if not texto:
@@ -131,7 +139,9 @@ def login():
             error = "Usuario o contraseña incorrectos."
             
     return render_template('login.html', error=error)
+#--------------------------------------------------------------------------------------------------------
 
+# ---------------------------------- REGISTRO DE USUARIOS ------------------------------------------------
 # Ruta de Registro con Clave de Autorización
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -161,8 +171,9 @@ def register():
             exito = "¡Usuario registrado con éxito!"
             
     return render_template('register.html', error=error, exito=exito)
-#-----------------------------------------------------------------------------|
+#---------------------------------------------------------------------------------------------------|
 
+#--------------------------------- PÁGINA PRINCIPAL ALUMNOS ------------------------------------------
 # Ruta de la página principal (Menú con pestañas)
 @app.route('/principal')
 def principal():
@@ -174,7 +185,7 @@ def principal():
     return render_template('index.html', alumnos=lista_alumnos)
 #---------------------------------------------------------------------------------------------------
 
-# ------------------------------------- ALUMNOS -----------------------------------------------------
+# --------------------------- IMPORTAR ALUMNOS DESDE GOOGLE SHEETS ----------------------------------
 # ----------------  Ruta para importar alumnos desde un archivo CSV ---------------------------------
 @app.route('/importar_alumnos', methods=['GET', 'POST'])
 def importar_alumnos():
@@ -279,6 +290,7 @@ def importar_alumnos():
     return render_template('importar.html')
 # ----------------------------------------------------------------------------------------
 
+# --------------------------  SECCIÓN ALUMNOS ------------------------------------------------
 # Ruta para ver la ficha detallada de un alumno
 @app.route('/alumno/<int:id_alumno>')
 def detalle_alumno(id_alumno):
@@ -292,7 +304,9 @@ def detalle_alumno(id_alumno):
     
     # Le pasamos la variable fecha_str a la plantilla
     return render_template('detalle_alumno.html', alumno=alumno, fecha_str=fecha_str)
+# --------------------------------------------------------------------------------------------------
 
+# -------------------------------- NUEVO ALUMNO ------------------------------------------------
 # Ruta para crear un nuevo alumno
 @app.route('/alumno/nuevo', methods=['GET', 'POST'])
 def nuevo_alumno():
@@ -334,7 +348,9 @@ def nuevo_alumno():
         return redirect(url_for('principal'))
         
     return render_template('form_alumno.html', alumno=None, fecha_str='')
+# ---------------------------------------------------------------------------------------------
 
+# -----------------------------------  EDITAR ALUMNO ------------------------------------------------
 # Ruta para editar un alumno existente
 @app.route('/alumno/editar/<int:id_alumno>', methods=['GET', 'POST'])
 def editar_alumno(id_alumno):
@@ -381,7 +397,9 @@ def editar_alumno(id_alumno):
         return render_template('form_alumno.html', alumno=alumno, fecha_str=fecha_str)
         
     return render_template('form_alumno.html', alumno=alumno)
+# -----------------------------------------------------------------------------------------------------
 
+# ------------------------------------- ELIMINAR ALUMNO ------------------------------------------------
 # Ruta para eliminar un alumno
 @app.route('/alumno/eliminar/<int:id_alumno>', methods=['POST'])
 def eliminar_alumno(id_alumno):
@@ -525,8 +543,9 @@ def generar_ficha_pdf(id_alumno):
     return send_file(ruta_completa, as_attachment=True)
 # ------------------------------------------------------------------------------------------------------------
 
-# ------------------------------------------------ SECCIÓN CURSOS --------------------------------------------
 
+
+# ------------------------------------------------ SECCIÓN CURSOS --------------------------------------------
 # Ruta para listar cursos filtrando por año lectivo (por defecto 2026)
 @app.route('/cursos')
 def listar_cursos():
@@ -550,6 +569,7 @@ def listar_cursos():
     return render_template('cursos.html', cursos=cursos, anio_actual=anio_actual)
 # ------------------------------------------------------------------------------------------------------------
 
+# ------------------------------------------------ NUEVO CURSO ------------------------------------------------
 # Ruta para crear un nuevo curso
 @app.route('/cursos/nuevo', methods=['GET', 'POST'])
 def nuevo_curso():
@@ -576,6 +596,7 @@ def nuevo_curso():
     return render_template('form_curso.html', alumnos=alumnos)
 # ---------------------------------------------------------------------------------------------------------
 
+# --------------------------------- EDITAR CURSOS --------------------------------------------------------
 # Ruta para editar un curso existente
 @app.route('/cursos/editar/<int:id_curso>', methods=['GET', 'POST'])
 def editar_curso(id_curso):
@@ -596,7 +617,7 @@ def editar_curso(id_curso):
     return render_template('form_curso.html', curso=curso, alumnos=alumnos)
 # ------------------------------------------------------------------------------------------------------------
 
-# ------------------------------------------------------------------------------------------------------------
+# --------------------------------------- ELIMINAR CURSOS --------------------------------------------------------------
 # Ruta para eliminar un curso
 @app.route('/cursos/eliminar/<int:id_curso>', methods=['POST'])
 def eliminar_curso(id_curso):
